@@ -124,7 +124,7 @@
           :title="showThinking ? 'Hide thinking' : 'Show thinking'"
         >
           <img 
-            :src="showThinking ? '/assets/show_thinking.png' : '/assets/hide_thinking.png'" 
+            :src="showThinking ? '/show_thinking.png' : '/hide_thinking.png'" 
             alt="Toggle thinking visibility" 
           />
         </div>
