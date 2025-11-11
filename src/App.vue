@@ -63,6 +63,10 @@
           
           <div class="message-text" v-html="formatMessage(msg.content)"></div>
           
+          <div class="message-footer">
+            <span class="message-timestamp">{{ msg.timestamp || '' }}</span>
+          </div>
+          
           <div v-if="msg.search_info" class="message-meta">
             <span v-if="msg.search_info.mode === 'product'" class="badge">Product Search</span>
             <span v-if="msg.search_info.mode === 'outlet'" class="badge">Outlet Search</span>
@@ -104,11 +108,11 @@
       </div>
 
       <div class="input-wrapper">
-        <input
+        <textarea
           v-model="inputMessage"
-          type="text"
-          placeholder="Type / for commands or ask about ZUS products..."
-          @keypress.enter="handleEnter"
+          placeholder="Type / for commands or ask about ZUS products... (Shift+Enter for new line)"
+          @keypress.enter.exact.prevent="handleEnter"
+          @keypress.enter.shift="handleShiftEnter"
           @keydown.up.prevent="navigateCommands(-1)"
           @keydown.down.prevent="navigateCommands(1)"
           @keydown.tab.prevent="handleTab"
@@ -117,7 +121,8 @@
           :disabled="loading"
           class="chat-input"
           ref="inputField"
-        />
+          rows="1"
+        ></textarea>
         <div 
           class="thinking-toggle" 
           @click="showThinking = !showThinking"
@@ -151,21 +156,31 @@
 </template>
 
 <script>
-import { ref, reactive, nextTick, computed } from 'vue'
+import { ref, reactive, nextTick, computed, onMounted } from 'vue'
 import commandHandler from './services/CommandHandler.js'
 import apiService from './services/ApiService.js'
+import storageService from './services/StorageService.js'
 import './styles/ChatContainer.css'
 
 export default {
   name: 'App',
   setup() {
-    const messages = reactive([
-      {
-        role: 'agent',
-        content: 'Hi! Welcome to ZUS Drinkware Chat. I can help you find products or locate nearby outlets. What would you like to know?',
-        search_info: null
-      }
-    ])
+    // Define getCurrentTimestamp FIRST before using it
+    const getCurrentTimestamp = () => {
+      const now = new Date()
+      // Convert to GMT+8 (Malaysia Time)
+      const gmt8Offset = 8 * 60 // 8 hours in minutes
+      const localOffset = now.getTimezoneOffset() // Get local timezone offset
+      const gmt8Time = new Date(now.getTime() + (gmt8Offset + localOffset) * 60000)
+      
+      const hours = String(gmt8Time.getHours()).padStart(2, '0')
+      const minutes = String(gmt8Time.getMinutes()).padStart(2, '0')
+      
+      return `${hours}:${minutes}`
+    }
+
+    // Initialize empty messages array (will be populated from localStorage or with welcome message)
+    const messages = reactive([])
 
     const inputMessage = ref('')
     const loading = ref(false)
@@ -186,12 +201,23 @@ export default {
       return commandHandler.filterCommands(inputMessage.value)
     })
 
+    const handleShiftEnter = (event) => {
+      // Allow default behavior (new line) for Shift+Enter
+      // The textarea will automatically handle the new line
+    }
+
     const handleInput = () => {
       if (commandHandler.shouldShowCommands(inputMessage.value)) {
         showCommands.value = true
         selectedCommandIndex.value = 0
       } else {
         showCommands.value = false
+      }
+      
+      // Auto-resize textarea
+      if (inputField.value) {
+        inputField.value.style.height = 'auto'
+        inputField.value.style.height = inputField.value.scrollHeight + 'px'
       }
     }
 
@@ -280,12 +306,18 @@ export default {
       messages.push({
         role: 'user',
         content: message,
-        search_info: null
+        search_info: null,
+        timestamp: getCurrentTimestamp()
       })
       inputMessage.value = ''
       loading.value = true
       error.value = null
       showCommands.value = false
+
+      // Reset textarea height
+      if (inputField.value) {
+        inputField.value.style.height = 'auto'
+      }
 
       await scrollToBottom()
 
@@ -304,7 +336,8 @@ export default {
           search_info: data.search_info,
           products_found: data.products_found,
           outlets_found: data.outlets_found,
-          planning_info: data.planning_info
+          planning_info: data.planning_info,
+          timestamp: getCurrentTimestamp()
         })
 
         connectionStatus.value = 'connected'
@@ -315,16 +348,49 @@ export default {
         messages.push({
           role: 'agent',
           content: 'Sorry, I encountered an error. Please try again.',
-          search_info: null
+          search_info: null,
+          timestamp: getCurrentTimestamp()
         })
       }
 
       loading.value = false
       await scrollToBottom()
+      
+      // Save to localStorage after response received
+      storageService.saveState(messages, sessionId.value)
     }
 
-    checkHealth()
-    loadStats()
+    // Initialize on component mount
+    onMounted(() => {
+      // Try to load from localStorage first
+      const savedState = storageService.loadState()
+      
+      if (savedState) {
+        // Restore messages
+        if (savedState.messages && savedState.messages.length > 0) {
+          messages.splice(0, messages.length, ...savedState.messages)
+        }
+        
+        // Restore session ID (same across tabs)
+        if (savedState.sessionId) {
+          sessionId.value = savedState.sessionId
+        }
+      }
+      
+      // If nothing loaded, show welcome message
+      if (messages.length === 0) {
+        messages.push({
+          role: 'agent',
+          content: 'Hi! Welcome to ZUS Drinkware Chat. I can help you find products or locate nearby outlets. What would you like to know?',
+          search_info: null,
+          timestamp: getCurrentTimestamp()
+        })
+      }
+      
+      checkHealth()
+      loadStats()
+      scrollToBottom()
+    })
 
     return {
       messages,
@@ -344,11 +410,13 @@ export default {
       scrollToBottom,
       handleInput,
       handleEnter,
+      handleShiftEnter,
       handleTab,
       navigateCommands,
       selectCommand,
       hideCommands,
-      formatMessage
+      formatMessage,
+      getCurrentTimestamp
     }
   }
 }

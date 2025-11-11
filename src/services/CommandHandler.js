@@ -5,6 +5,8 @@
  * Extracted from App.vue for better separation of concerns.
  */
 
+import storageService from './StorageService.js'
+
 export class CommandHandler {
   constructor() {
     this.commands = [
@@ -48,11 +50,28 @@ export class CommandHandler {
     messages.push({
       role: 'agent',
       content: 'Chat cleared! 🧹 How can I help you?',
-      search_info: null
+      search_info: null,
+      timestamp: this.getCurrentTimestamp()
     })
     if (sessionIdRef) {
       sessionIdRef.value = null
     }
+    
+    // Clear localStorage using StorageService
+    storageService.clearState()
+  }
+
+  getCurrentTimestamp() {
+    const now = new Date()
+    // Convert to GMT+8 (Malaysia Time)
+    const gmt8Offset = 8 * 60 // 8 hours in minutes
+    const localOffset = now.getTimezoneOffset() // Get local timezone offset
+    const gmt8Time = new Date(now.getTime() + (gmt8Offset + localOffset) * 60000)
+    
+    const hours = String(gmt8Time.getHours()).padStart(2, '0')
+    const minutes = String(gmt8Time.getMinutes()).padStart(2, '0')
+    
+    return `${hours}:${minutes}`
   }
 
   hideCommands(showCommandsRef) {
@@ -99,7 +118,8 @@ export class CommandHandler {
         messages.push({
           role: 'agent',
           content: `Available commands:\n\n${this.commands.map(c => `${c.command} - ${c.description}`).join('\n')}`,
-          search_info: null
+          search_info: null,
+          timestamp: this.getCurrentTimestamp()
         })
         if (scrollToBottomCallback) {
           scrollToBottomCallback()
@@ -113,7 +133,8 @@ export class CommandHandler {
         messages.push({
           role: 'agent',
           content: statsMessage,
-          search_info: null
+          search_info: null,
+          timestamp: this.getCurrentTimestamp()
         })
         if (scrollToBottomCallback) {
           scrollToBottomCallback()

@@ -123,6 +123,23 @@
   max-width: 70%;
 }
 
+.message-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.message-timestamp {
+  font-size: 11px;
+  color: #888;
+  opacity: 0.8;
+}
+
+.message.agent .message-footer {
+  justify-content: flex-end;
+}
+
 .message.agent .message-content {
   align-items: flex-end;
 }
@@ -132,6 +149,7 @@
   border-radius: 12px;
   line-height: 1.5;
   word-wrap: break-word;
+  white-space: pre-wrap; /* Preserve line breaks */
 }
 
 .message.agent .message-text {
@@ -408,6 +426,12 @@
   font-size: 14px;
   outline: none;
   transition: border-color 0.2s;
+  resize: none;
+  min-height: 44px;
+  max-height: 150px;
+  overflow-y: auto;
+  font-family: inherit;
+  line-height: 1.5;
 }
 
 .chat-input:focus {
