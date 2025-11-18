@@ -20,9 +20,10 @@ dist-ssr/
 # Environment variables (IMPORTANT!)
 .env
 .env.local
-.env.development.local
+.env.development
 .env.test.local
 .env.production.local
+.env.production
 
 # Editor
 .vscode/*
